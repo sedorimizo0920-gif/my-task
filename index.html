@@ -595,21 +595,19 @@ function renderSlack(main) {
 // ── ACTIONS ──
 async function handleToggle(id) {
   const t=tasks.find(t=>String(t.id)===String(id)); if(!t)return;
-  const el=document.querySelector(`#tc-${id} .checkbox`);
-  if(el){ el.classList.add('loading-check'); }
-
   const wasDone=isDoneToday(t);
   const label=formatLabel(todayStr());
 
-  // optimistic update
   if(wasDone){ t.done=false; t.doneDate=''; t.doneLabel=''; }
   else { t.done=true; t.doneDate=todayStr(); t.doneLabel=label; }
   render();
 
   try {
     await api({ action:'toggleDone', id, date:todayStr(), label });
+    // GASから最新データを取得して反映
+    await loadTasks();
+    render();
   } catch(e) {
-    // revert
     if(wasDone){ t.done=true; t.doneDate=todayStr(); t.doneLabel=label; }
     else { t.done=false; t.doneDate=''; t.doneLabel=''; }
     render(); showError('保存に失敗しました');
