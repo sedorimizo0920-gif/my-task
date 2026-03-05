@@ -369,7 +369,7 @@ function isActiveToday(t) {
   if (t.schedule==='once')          return t.date===todayStr();
   return false;
 }
-function isDoneToday(t) { return String(t.done)==='true' && t.doneDate===todayStr(); }
+function isDoneToday(t) { return (t.done === true || t.done === 'true' || t.done === 'TRUE') && t.doneDate === todayStr(); }
 function fmtTime(s)     { if(!s)return ''; const [h,m]=s.split(':'); return `${parseInt(h)}:${m}`; }
 
 // ── HEADER ──
