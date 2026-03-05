@@ -336,6 +336,8 @@ main { padding: 24px; max-width: 700px; margin: 0 auto; }
 <script>
 // ── CONFIG ──
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbyh7w3R77NYIK_YADvi8qPZx_VD906ux-aS-VBrjn225uRFNFgdhX6B-pkZYmYTRoEYMg/exec';
+const CACHE_KEY = 'mizoguchi_cache_v1';
+const CACHE_TTL = 5 * 60 * 1000; // 5分
 
 const DAYS_JP = ['日','月','火','水','木','金','土'];
 let tasks = [];
@@ -384,14 +386,45 @@ async function api(params) {
   return res.json();
 }
 
-async function loadTasks() {
+// ── CACHE ──
+function saveCache(data) {
+  try { localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), data })); } catch(e){}
+}
+function loadCache() {
+  try {
+    const c = JSON.parse(localStorage.getItem(CACHE_KEY)||'null');
+    if (c && Date.now() - c.ts < CACHE_TTL) return c.data;
+  } catch(e){}
+  return null;
+}
+function clearCache() { localStorage.removeItem(CACHE_KEY); }
+
+async function loadTasks(forceRefresh=false) {
+  // キャッシュがあれば即座に表示
+  if (!forceRefresh) {
+    const cached = loadCache();
+    if (cached) { tasks = cached; return; }
+  }
   try {
     const data = await api({ action: 'getTasks' });
     tasks = Array.isArray(data) ? data : [];
+    saveCache(tasks);
   } catch(e) {
     tasks = [];
-    showError('データの読み込みに失敗しました。ページを再読み込みしてください。');
+    showError('データの読み込みに失敗しました。');
   }
+}
+
+// バックグラウンドでデータを更新（画面は止めない）
+async function bgSync() {
+  try {
+    const data = await api({ action: 'getTasks' });
+    if (Array.isArray(data)) {
+      tasks = data;
+      saveCache(tasks);
+      render(); // サイレントに更新
+    }
+  } catch(e) {}
 }
 
 function showError(msg) {
@@ -621,6 +654,7 @@ async function deleteTask(id) {
   const t=tasks.find(t=>String(t.id)===String(id));
   if(!t||!confirm(`「${t.name}」を削除しますか？`))return;
   tasks=tasks.filter(t=>String(t.id)!==String(id));
+  saveCache(tasks);
   render();
   await api({ action:'deleteTask', id });
   showToast(`「${t.name}」を削除しました`, null);
